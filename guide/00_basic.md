@@ -14,9 +14,21 @@ I choose the 64-bit version.
 
 <https://www.raspberrypi.com/software/operating-systems/>
 
-Also Etcher is needed to write the image to the SD card.
+~~Also Etcher is needed to write the image to the SD card.~~
 
-<https://etcher.balena.io/>
+~~<https://etcher.balena.io/>~~
+
+Etcher did not work for me on my Linux notebook. I have to use `dd` instead.
+
+```bash
+sudo dd if=2023-10-10-raspios-bookworm-arm64-lite.img bs=4M of=/dev/sdc oflag=sync status=progress
+
+# Note: Awfully slow without bs option (default at 512KB)
+# status=progress shows the progress on command prompt
+# sync flag to ensure it is probably flushed
+```
+
+Or I can use the GNOME disk image writer on my OS.
 
 ## Headless setup
 
@@ -54,6 +66,17 @@ Boot the pi and we can now SSH into it!
 ## Hardening
 
 Now we have the basic setup. Time for configuration/customization...
+
+### Update hostname
+
+```bash
+sudo hostnamectl set-hostname (new hostname)
+
+sudo vi /etc/hosts  # the old hostname still remains in host file. Update it
+
+# Now sudo whatever command should not show error like
+# sudo: unable to resolve host (hostname): Name or service not known
+```
 
 ### Update OS and reboot
 
@@ -133,7 +156,7 @@ chage -l $USER # verify, should be same as above
 
 Some reference <https://www.raspberrypi.com/documentation/computers/configuration.html#improving-ssh-security>
 
-First step, generate ssh key pair in another machine.
+First step, generate ssh key pair in another machine (the client side).
 
 ```bash
 ssh-keygen -t ed25519  # ed25519 is personal preference
@@ -205,7 +228,7 @@ Then hardening SSH server config - /etc/ssh/sshd_config
 
 ```bash
 sudo vi /etc/ssh/sshd_config
-# Comment out the line AcceptEnv LANG LC_*
+# !!! Comment out the line AcceptEnv LANG LC_* !!!
 # This would fix the problem of "man: can't set the locale; make sure $LC_* and $LANG are correct"
 # From https://forums.raspberrypi.com//viewtopic.php?f=50&t=11870
 
@@ -217,11 +240,19 @@ cat /etc/ssh/sshd_config.d/pi_custom.conf
 PasswordAuthentication no
 PermitRootLogin no
 UsePAM no
+
+sudo chmod 644 /etc/ssh/sshd_config.d/pi_custom.conf
 ```
 
 Not really sure about the PAM option... PAM seems won't do much on this home pi server setup.
 
-Finally, test if our public key pair works and password would fail or not.
+The moment of truth - restart sshd to apply new settings.
+
+```bash
+sudo systemctl restart sshd
+```
+
+Finally, test if our public key pair works and password would fail or not. (From out client-side)
 
 ```bash
 ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password username@pi-hostname  # should fail - Permission denied (publickey).
@@ -238,15 +269,4 @@ ssh my_pi  # the alias in ~/.ssh/config.
 echo 'set number' >> ~/.vimrc
 echo 'set nocompatible' >> ~/.vimrc
 echo 'set backspace=2' >> ~/.vimrc
-```
-
-#### Update hostname
-
-```bash
-sudo hostnamectl set-hostname (new hostname)
-
-vi /etc/hosts  # the old hostname still remains in host file. Update it
-
-# Now sudo whatever command should not show error like
-# sudo: unable to resolve host (hostname): Name or service not known
 ```
