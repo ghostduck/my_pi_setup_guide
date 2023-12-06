@@ -20,7 +20,18 @@ I choose the 64-bit version.
 
 Etcher did not work for me on my Linux notebook. I have to use `dd` instead.
 
+**Reminder: Use `lsblk` to find your SD card device name first (`/dev/sdx`)!**
+
 ```bash
+lsblk
+
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+# ...
+sdc      8:32   1  29.7G  0 disk
+├─sdc1   8:33   1   512M  0 part /media/user/bootfs
+└─sdc2   8:34   1  29.2G  0 part /media/user/rootfs
+
+
 sudo dd if=2023-10-10-raspios-bookworm-arm64-lite.img bs=4M of=/dev/sdc oflag=sync status=progress
 
 # Note: Awfully slow without bs option (default at 512KB)
@@ -59,102 +70,21 @@ Then you enter the user username and encrypted password into the `userconf.txt`.
 duck:$6$04wstsomethinglong...
 ```
 
-Boot the pi and we can now SSH into it!
+You can copy this `userconf.txt` if you plan to install different machines with same username and password.
 
-**In your router remember to reserve an address for your Pi as it will be your main DNS and DHCP server.**
+**In your router remember to reserve an address for your Pi for easier first time access.**
+
+We will switch off the DHCP in router (or change the DNS server) only after Pi-Hole and related setup is completed.
+
+Boot the pi and we can now SSH into it!
 
 ## Hardening
 
 Now we have the basic setup. Time for configuration/customization...
 
-### Update hostname
-
-```bash
-sudo hostnamectl set-hostname (new hostname)
-
-sudo vi /etc/hosts  # the old hostname still remains in host file. Update it
-
-# Now sudo whatever command should not show error like
-# sudo: unable to resolve host (hostname): Name or service not known
-```
-
-### Update OS and reboot
-
-Manual step recommendation from offical guide - check if we have enough space beforehand.
-
-`df -Ph`
-
-To update packages:
-
-```bash
-# Update package list
-sudo apt update
-
-# Install them
-sudo apt full-upgrade # -y  # if you dare or for automation # otherwise manually enter y to continue
-
-# Remove unwanted packages
-sudo apt autoremove # -y  # if you dare or for automation # otherwise manually enter y to continue
-
-sudo reboot
-```
-
-To update firmware:
-
-Note the warning message from the program...
-
-```txt
-#############################################################
-WARNING: This update bumps to rpi-6.1.y linux tree
-See: https://forums.raspberrypi.com/viewtopic.php?t=344246
-
-'rpi-update' should only be used if there is a specific
-reason to do so - for example, a request by a Raspberry Pi
-engineer or if you want to help the testing effort
-and are comfortable with restoring if there are regressions.
-
-DO NOT use 'rpi-update' as part of a regular update process.
-##############################################################
-```
-
-So we are not supposed to upgrade the firmware automatically...
-
-```bash
-sudo rpi-update
-sudo reboot
-```
-
-### User password
-
-If you were using insecure password at the beginning (with the not so convenient copy and paste of encrypted password), it is time to change it.
-
-```bash
-passwd
-
-# Check related policies
-$ chage -l $USER
-Last password change:                              May 03, 2023
-Password expires:                                  never
-Password inactive:                                 never
-Account expires:                                   never
-Minimum number of days between password change:    0
-Maximum number of days between password change:    99999
-Number of days of warning before password expires: 7
-```
-
-I am not a fan of changing password regularly so I like the current setup. (And I suppose this is the only active user on my pi as well)
-
-Just in case the user settings is something not the same as above... (Note: related to `/etc/login.defs`)
-
-```bash
-sudo chage -m 0 -M 99999 -E -1 -I -1 $USER
-
-chage -l $USER # verify, should be same as above
-```
-
 ### SSH setup - no root login, only SSH public key pair
 
-Some reference <https://www.raspberrypi.com/documentation/computers/configuration.html#improving-ssh-security>
+Some references: <https://www.raspberrypi.com/documentation/computers/configuration.html#improving-ssh-security>
 
 First step, generate ssh key pair in another machine (the client side).
 
@@ -259,6 +189,91 @@ ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password username@pi-
 
 ssh my_pi  # the alias in ~/.ssh/config.
 # Should get into the server directly
+```
+
+### Update hostname
+
+```bash
+sudo hostnamectl set-hostname (new hostname)
+
+sudo vi /etc/hosts  # the old hostname still remains in host file. Update it
+
+# Now sudo whatever command should not show error like
+# sudo: unable to resolve host (hostname): Name or service not known
+```
+
+### Update OS and reboot
+
+Manual step recommendation from offical guide - check if we have enough space beforehand.
+
+`df -Ph`
+
+To update packages:
+
+```bash
+# Update package list
+sudo apt update
+
+# Install them
+sudo apt full-upgrade # -y  # if you dare or for automation # otherwise manually enter y to continue
+
+# Remove unwanted packages
+sudo apt autoremove # -y  # if you dare or for automation # otherwise manually enter y to continue
+
+sudo reboot
+```
+
+To update firmware:
+
+Note the warning message from the program...
+
+```txt
+#############################################################
+WARNING: This update bumps to rpi-6.1.y linux tree
+See: https://forums.raspberrypi.com/viewtopic.php?t=344246
+
+'rpi-update' should only be used if there is a specific
+reason to do so - for example, a request by a Raspberry Pi
+engineer or if you want to help the testing effort
+and are comfortable with restoring if there are regressions.
+
+DO NOT use 'rpi-update' as part of a regular update process.
+##############################################################
+```
+
+So we are not supposed to upgrade the firmware automatically...
+
+```bash
+sudo rpi-update
+sudo reboot
+```
+
+### User password
+
+If you were using insecure password at the beginning (with the not so convenient copy and paste of encrypted password), it is time to change it.
+
+```bash
+passwd
+
+# Check related policies
+$ chage -l $USER
+Last password change:                              May 03, 2023
+Password expires:                                  never
+Password inactive:                                 never
+Account expires:                                   never
+Minimum number of days between password change:    0
+Maximum number of days between password change:    99999
+Number of days of warning before password expires: 7
+```
+
+I am not a fan of changing password regularly so I like the current setup. (And I suppose this is the only active user on my pi as well)
+
+Just in case the user settings is something not the same as above... (Note: related to `/etc/login.defs`)
+
+```bash
+sudo chage -m 0 -M 99999 -E -1 -I -1 $USER
+
+chage -l $USER # verify, should be same as above
 ```
 
 ### Other minor stuff
