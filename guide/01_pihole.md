@@ -134,7 +134,7 @@ server:
 Then restart the unbound service. Finally check if it works or not.
 
 ```bash
-sudo service unbound restart
+sudo service unbound restart # same as # sudo systemctl restart unbound
 systemctl status unbound  # should be enabled and active
 
 # Testing
@@ -200,6 +200,7 @@ $ dig dnssec-failed.org @127.0.0.1 -p 5335
 ;; WHEN: Wed Jul 19 03:21:19 BST 2023
 ;; MSG SIZE  rcvd: 46
 
+# Note the "status: SERVFAIL"
 
 $ dig dnssec.works @127.0.0.1 -p 5335
 
@@ -221,15 +222,19 @@ dnssec.works.		3600	IN	A	5.45.107.88
 ;; SERVER: 127.0.0.1#5335(127.0.0.1)
 ;; WHEN: Wed Jul 19 03:16:38 BST 2023
 ;; MSG SIZE  rcvd: 57
+
+# Note the "status: NOERROR"
 ```
 
-If all good, update the DNS server settings in pi-hole so that only the local DNS recursor will be used. (In the web interface)
+If all good, update the DNS server settings in pi-hole so that only the local DNS recursor will be used. (In the web interface, set `127.0.0.1#5335` in Upstream DNS Servers)
 
 Still we are not done yet...
 
 > Debian Bullseye+ releases auto-install a package called openresolv with a certain configuration that will cause unexpected behaviour for pihole and unbound. (as at 19 Jul 2023)
 
 So we have to workaround it...
+
+(Update on 4 Dec 2023) I reinstall the Pi using the latest Lite image. The Debian version becomes 12 and the codename is bookworm. I cannot find the `unbound-resolvconf.service`, `/etc/resolvconf.conf` and the `/etc/unbound/unbound.conf.d/resolvconf_resolvers.conf`... I guess I can skip these steps.
 
 ```bash
 # confirm Debian version is bullseye+ or not
@@ -265,6 +270,7 @@ We want these part to be contained in the config file `/etc/unbound/unbound.conf
 server:
     # If no logfile is specified, syslog is used
     logfile: "/var/log/unbound/unbound.log"
+    log-time-ascii: yes
     verbosity: 1
 ```
 
@@ -298,34 +304,30 @@ I don't have AppArmor in my current pi right now so I skipped the `apparmor_pars
 
 All done now!
 
-## Some useful commands for pi-hole
+## Setting static IP
 
-To reset Web Interface password:
+Make sure we are using static IP for this DNS server. Address reservation from router is still DHCP and can still cause troubles.
 
-```bash
-pihole -a -p
-```
-
-Backup settings:
+I suggesting setting static IP after installing Pi-hole and unbound as they need DNS to download the packages.
 
 ```bash
-# Feel free to change the file name
-pihole -a -t pihole_settings.tar.gz
+$ sudo nmcli connection add con-name home-wired ifname eth0 type ethernet
+
+$ sudo nmcli con modify home-wired ipv4.method manual \
+    ipv4.addresses 192.168.1.10/24 \
+    ipv4.gateway 192.168.1.1
+
+# Do we need DNS on a DNS server? I don't think so
+
+$ sudo nmcli con down 'replace me with old connection name' && sudo nmcli con up home-wired
+
+# If we can up the new connection without problem:
+$ sudo nmcli con delete 'old connection name'
 ```
 
-Seems we can only import the settings from the Web UI?
+Don't forget to **disable DHCP for your router** and **use the DHCP from Pi-Hole instead**.
 
-Update block list:
-
-```bash
-pihole -g
-```
-
-Update Pi-hole
-
-```bash
-pihole -up
-```
+Make sure we reboot both Pi and router to see if everything works well or not.
 
 ## References
 
